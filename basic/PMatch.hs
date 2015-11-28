@@ -27,32 +27,6 @@ pmatch' t1 t2 = case (t1,t2) of
                  (Free li1, Free li2) -> fmap concat $ sequence $ zipWith pmatch' li1 li2
                  _ -> Nothing
 
-{-
-substStep' :: (HasVar v a) => M.Map v (LeafTree a) -> LeafTree a -> Either (LeafTree a) (LeafTree a) -- Right if succeeded
-substStep' m lt = 
-    let
-        b = foldl (\x a -> x || getVar a == Just v) False ss
-        lt' = sub m lt
-    in
-      (if b then Right else Left) lt'
-
-substStep m = untilLeft (substStep' m)
-
---can make more efficient...
-substStep2 :: (HasVar v a) => M.Map v (LeafTree a) -> [(LeafTree a, LeafTree a)] -> [(LeafTree a, LeafTree a)]
-substStep2 m li = map (substStep m) li-}
-
-{-
-constraintStep :: ExceptT (LeafTree a, LeafTree a) (State [(LeafTree a), (LeafTree a)]) ()
-constraintStep = do
-  li <- get
-  case li of
-    [] -> return ()
-    (t1, t2):rest -> 
-        do 
-          li <- pmatch' t1 t2
-          substStep2 m li-}
-
 --Warning: only use this if you used pmatch' where only t1 or only t2 had free variables. It can't deal with multiple constraints on the same variable, like ?b = ?c -> ?d, ?b = ?e.
 toSubMap :: (Eq b, Eq c, Ord b) => [(b, c)] -> Maybe (M.Map b c)
 toSubMap = foldl (\m (b,c) -> m >>= (\m' -> if b `M.notMember` m' || m' M.! b == c then Just $ M.insert b c m' else Nothing)) (Just M.empty)

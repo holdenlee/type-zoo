@@ -71,16 +71,6 @@ instance Listlike (ExprBuilder String) where
                 [Pure "fun", Pure v, a] -> Fun v a
                 li -> App li
 
-{-instance Show Expr' where 
-    show = show . toLeafTree-}
-
-{-sub :: (Functor f, HasVar v a, Ord v) => M.Map v (Free f a) -> Free f a -> Free f a
-sub m e = e >>= (\x -> fromMaybe (return x) (getVar x >>= (\y -> M.lookup y m)))
--}    
-{-
-instance Subbable String Polytype where
-    sub s (Forall vars t) = Forall vars (sub s t)-}
-
 comp :: (Subbable v s, Ord v) => M.Map v s -> M.Map v s -> M.Map v s
 comp m2 m1 = (M.map (sub m2) m1) `M.union` m2
 --m1 is first. then m2
@@ -179,9 +169,7 @@ main = do
   let expr = parseE "(single (let x id (x id 1)))" :: Expr'
   --print expr
   let subst = M.fromList li1
-  --let subst = M.fromList ["f", (Pure $ JustA "a") ->> (Pure $ JustA "a")]
   let (t, w) = runIdentity $ evalSupply (runWriterT $ runReaderT (getConstraints expr) (subst)) (map (('x':).show) [1..]) -- need to make sure this isn't used
-  --let subst = M.fromList 
   prettyList w
   let s = evalState solve (M.empty, w)
   putStrLn $ pretty $ sub s t
@@ -222,97 +210,3 @@ solve = do
             let m' = m `comp` m2
             put (m', rest''')
             solve
-
---subt m (Forall s t) = Forall s (sub m t)
-
-{-
-runAndReset :: Infer Sub [(Type', Type')] String a -> Infer Sub [(Type', Type')] String ()
-runAndReset i = do
-  subst <- get
-  i
-  put subst
-
-getTVars :: Type' -> S.Set String
-getTVars t = case t of
-               TApp li -> foldl S.union S.empty (map getTVars li)
-               Type t -> S.empty
-               TVar a -> S.singleton a
-
-refresh :: Type' -> Supply String Type'
-refresh t = do
-  let tvs = S.toList $ getTVars t
-  let s = length tvs
-  as <- sequence $ replicate s supply
-  let sub = M.fromList $ zip tvs as
-  return $ subVar sub t
-
-getConstraints' :: Expr' -> Infer Sub [(Type', Type')] String ()
-getConstraints' expr = 
-    do
-      a <- supply
-      getConstraints a expr
-
-getConstraints :: String -> Expr' -> Infer Sub [(Type', Type')] String ()
-getConstraints a expr = 
-    case expr of
-      Let x e1 e2 ->  
-          do
-            --insert x::a into map
-            b <- supply
-            modify (M.insert x (TVar b))
-            --get constraints for what we're substituting for x
-            runAndReset (getConstraints b e1)
-            getConstraints a e2
-      Fun x e -> 
-          do
-            b <- supply 
-            modify (M.insert x (TVar b))
-            getConstraints a e
-      App (f:rest) -> 
-          do
-            subst <- get 
-            b <- supply
-            let l = length rest
-            as <- sequence $ replicate l supply
-            --b = a_1 -> a_2 -> ... -> a_l -> a
-            lift $ tell [(TVar b, foldl1 fun $ map TVar (as++[a]))]
-            runAndReset (getConstraints b f)
-            --now sequence on each argument
-            mapM_ (\i -> runAndReset (getConstraints (as!!i) (rest!!i))) [0..(l-1)]
-      JustA x -> 
-          do
-            subst <- get
-            let b = fromJust (M.lookup x subst)
-            b' <- lift $ lift $ refresh b
-            lift $ tell [(TVar a,b')]
-    
-parseE :: (IsLeafTree String c) => String -> c 
-parseE = fromJust . fmap fromLeafTree . parseLISP
-
---calling this "Type" isn't quite right
-fun x y = TApp [Type "Fun", x, y]
---forall li = Forall (S.fromList li)
-set x = TApp [Type "Set", x]
-
-{-
-match :: Type' -> Type' -> Maybe Sub
-match t1 t2 = case (t1, t2) of 
-                (TVar x, t2) -> S.fromList [(x, t2)]
-                
-
-subadd :: Sub -> Sub -> Sub
-subadd = undefined-}
-
-main = do
-  let expr = parseE "(g (let x id (x id 1)))" :: Expr'
-  let subst = M.fromList [("id", fun (TVar "a") (TVar "a")),
-                          ("g", fun (TVar "a1") (set (TVar "a1"))), 
-                          ("1", Type "Int")]
-  --let subst = M.fromList ["f", (Pure $ JustA "a") ->> (Pure $ JustA "a")]
-  let w = runIdentity $ evalSupply (execWriterT $ evalStateT (getConstraints' expr) (subst)) (map (('x':).show) [1..]) -- need to make sure this isn't used
-  --let subst = M.fromList 
-  printList w
-
-printList :: (Show a) => [a] -> IO ()
-printList = mapM_ (putStrLn . show)
--}
